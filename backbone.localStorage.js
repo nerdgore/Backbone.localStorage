@@ -90,6 +90,9 @@ _.extend(Backbone.LocalStorage.prototype, {
   },
 
   localStorage: function() {
+      if (typeof localStorage != "object") {
+          throw new Error("localStorage is not available");
+      }
       return localStorage;
   },
   
@@ -104,22 +107,32 @@ _.extend(Backbone.LocalStorage.prototype, {
 // *localStorage* property, which should be an instance of `Store`.
 // window.Store.sync and Backbone.localSync is deprectated, use Backbone.LocalStorage.sync instead
 Backbone.LocalStorage.sync = window.Store.sync = Backbone.localSync = function(method, model, options) {
-  var store = model.localStorage || model.collection.localStorage;
+  var error, resp, store, syncDfd;
+  
+  store = model.localStorage || model.collection.localStorage;
 
-  var resp, syncDfd = $.Deferred && $.Deferred(); //If $ is having Deferred - use it. 
+  syncDfd = $.Deferred && $.Deferred(); //If $ is having Deferred - use it. 
 
-  switch (method) {
-    case "read":    resp = model.id != undefined ? store.find(model) : store.findAll(); break;
-    case "create":  resp = store.create(model);                            break;
-    case "update":  resp = store.update(model);                            break;
-    case "delete":  resp = store.destroy(model);                           break;
+  try {
+    
+    switch (method) {
+      case "read":    resp = model.id != undefined ? store.find(model) : store.findAll(); break;
+      case "create":  resp = store.create(model);                            break;
+      case "update":  resp = store.update(model);                            break;
+      case "delete":  resp = store.destroy(model);                           break;
+    }
+    error = new Error("Record not found");
+  } catch (err) {
+    error = err;
   }
+
+
 
   if (resp) {
     if (options && options.success) options.success(resp);
     if (syncDfd) syncDfd.resolve();
   } else {
-    if (options && options.error) options.error("Record not found");
+    if (options && options.error) options.error(error);
     if (syncDfd) syncDfd.reject();
   }
   
